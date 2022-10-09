@@ -168,11 +168,17 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign VGA_F1    = 0;
 assign VGA_SCALER= 0;
-assign USER_OUT  = '1;
+//LLAPI
+//assign USER_OUT  = '1;
+//END
 assign LED_USER  = ioctl_download;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
-assign BUTTONS   = 0;
+//assign BUTTONS   = 0;
+//assign BUTTONS   = 0;
+//LLAPI
+assign BUTTONS   = llapi_osd;
+//END
 assign AUDIO_MIX = 0;
 assign HDMI_FREEZE = 0;
 
@@ -198,6 +204,10 @@ localparam CONF_STR = {
 	"O6,Service Mode,Off,On;",
 	"-;",
 	"DIP;",
+	"-;",
+	//LLAPI
+	"OM,Serial Mode,Off,LLAPI;",
+	//END
 	"-;",
 	"H1OR,Autosave Hiscores,Off,On;",
 	"P1,Pause options;",
@@ -254,7 +264,9 @@ wire  [7:0] ioctl_din;
 wire  [7:0] ioctl_index;
 wire        ioctl_wait;
 
+
 wire [15:0] joystk1, joystk2;
+
 wire [21:0] gamma_bus;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
@@ -283,29 +295,143 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.joystick_1(joystk2)
 );
 
+////////////////////////////  LLAPI  ///////////////////////////////////
 
-wire m_up2     = joystk2[3];
-wire m_down2   = joystk2[2];
-wire m_left2   = joystk2[1];
-wire m_right2  = joystk2[0];
-wire m_trig21  = joystk2[4];
-wire m_trig22  = joystk2[5];
+wire [31:0] llapi_buttons, llapi_buttons2;
+wire [71:0] llapi_analog, llapi_analog2;
+wire [7:0]  llapi_type, llapi_type2;
+wire llapi_en, llapi_en2;
 
-wire m_start1  = joystk1[6] | joystk2[6];
-wire m_start2  = joystk1[7] | joystk2[7];
+wire llapi_select = status[22];
 
-wire m_up1     = joystk1[3] | (bCabinet ? 1'b0 : m_up2);
-wire m_down1   = joystk1[2] | (bCabinet ? 1'b0 : m_down2);
-wire m_left1   = joystk1[1] | (bCabinet ? 1'b0 : m_left2);
-wire m_right1  = joystk1[0] | (bCabinet ? 1'b0 : m_right2);
-wire m_trig11  = joystk1[4] | (bCabinet ? 1'b0 : m_trig21);
-wire m_trig12  = joystk1[5] | (bCabinet ? 1'b0 : m_trig22);
+wire llapi_latch_o, llapi_latch_o2, llapi_data_o, llapi_data_o2;
 
-wire m_coin1   = joystk1[8];
-wire m_coin2   = joystk2[8];
+reg llapi_button_pressed, llapi_button_pressed2;
+
+always @(posedge CLK_50M) begin
+//        if (reset) begin
+//                llapi_button_pressed  <= 0;
+//                llapi_button_pressed2 <= 0;
+//	end else begin
+	       	if (|llapi_buttons)
+                	llapi_button_pressed  <= 1;
+        	if (|llapi_buttons2)
+                	llapi_button_pressed2 <= 1;
+//	end
+end
+
+// controller id is 0 if there is either an Atari controller or no controller
+// if id is 0, assume there is no controller until a button is pressed
+// also check for 255 and treat that as 'no controller' as well
+wire use_llapi  = llapi_en  && llapi_select && ((|llapi_type  && ~(&llapi_type))  || llapi_button_pressed);
+wire use_llapi2 = llapi_en2 && llapi_select && ((|llapi_type2 && ~(&llapi_type2)) || llapi_button_pressed2);
+
+
+// Indexes:
+// 0 = D+    = P1 Latch
+// 1 = D-    = P1 Data
+// 2 = TX-   = LLAPI Enable
+// 3 = GND_d = N/C
+// 4 = RX+   = P2 Latch
+// 5 = RX-   = P2 Data
+
+always_comb begin
+	USER_OUT = 6'b111111;
+	if (llapi_select) begin
+		USER_OUT[0] = llapi_latch_o;
+		USER_OUT[1] = llapi_data_o;
+		USER_OUT[2] = ~(llapi_select & ~OSD_STATUS);
+		USER_OUT[4] = llapi_latch_o2;
+		USER_OUT[5] = llapi_data_o2;
+	end
+end
+
+LLAPI llapi
+(
+	.CLK_50M(CLK_50M),
+	.LLAPI_SYNC(vblank),
+	.IO_LATCH_IN(USER_IN[0]),
+	.IO_LATCH_OUT(llapi_latch_o),
+	.IO_DATA_IN(USER_IN[1]),
+	.IO_DATA_OUT(llapi_data_o),
+	.ENABLE(llapi_select & ~OSD_STATUS),
+	.LLAPI_BUTTONS(llapi_buttons),
+	.LLAPI_ANALOG(llapi_analog),
+	.LLAPI_TYPE(llapi_type),
+	.LLAPI_EN(llapi_en)
+);
+
+LLAPI llapi2
+(
+	.CLK_50M(CLK_50M),
+	.LLAPI_SYNC(vblank),
+	.IO_LATCH_IN(USER_IN[4]),
+	.IO_LATCH_OUT(llapi_latch_o2),
+	.IO_DATA_IN(USER_IN[5]),
+	.IO_DATA_OUT(llapi_data_o2),
+	.ENABLE(llapi_select & ~OSD_STATUS),
+	.LLAPI_BUTTONS(llapi_buttons2),
+	.LLAPI_ANALOG(llapi_analog2),
+	.LLAPI_TYPE(llapi_type2),
+	.LLAPI_EN(llapi_en2)
+);
+
+//  MAPPING : "	"J1,Jump,Start 1P,Start 2P,Coin,Pause;",
+
+
+wire [15:0] joy_ll_a = { 8'd0,												   // Pause
+	llapi_buttons[4],  llapi_buttons[6],  llapi_buttons[5],  llapi_buttons[1],  llapi_buttons[0], // Coin Start-2P Start-1P Jump
+	llapi_buttons[27], llapi_buttons[26], llapi_buttons[25], llapi_buttons[24] // d-pad
+};
+
+wire [15:0] joy_ll_b = { 8'd0,												   // Pause
+	llapi_buttons2[4],  llapi_buttons2[6],  llapi_buttons2[5],  llapi_buttons2[1],  llapi_buttons2[0], // Coin Start-2P Start-1P Jump
+	llapi_buttons2[27], llapi_buttons2[26], llapi_buttons2[25], llapi_buttons2[24] // d-pad
+};
+
+wire llapi_osd = (llapi_buttons[26] && llapi_buttons[5] && llapi_buttons[0]) || (llapi_buttons2[26] && llapi_buttons2[5] && llapi_buttons2[0]);
+
+
+// if LLAPI is enabled, shift USB controllers over to the next available player slot
+wire [15:0] joy_1, joy_2;
+always_comb begin
+        if (use_llapi & use_llapi2) begin
+                joy_1 = joy_ll_a;
+                joy_2 = joy_ll_b;
+        end else if (use_llapi ^ use_llapi2) begin
+                joy_1 = use_llapi  ? joy_ll_a : joystk1;
+                joy_2 = use_llapi2 ? joy_ll_b : joystk2;
+        end else begin
+                joy_1 = joystk1;
+                joy_2 = joystk2;
+        end
+end
+
+////////////////////////     END LLAPI    /////////////////////////
+
+
+wire m_up2     = joy_2[3];
+wire m_down2   = joy_2[2];
+wire m_left2   = joy_2[1];
+wire m_right2  = joy_2[0];
+wire m_trig21  = joy_2[4];
+wire m_trig22  = joy_2[5];
+
+wire m_start1  = joy_1[6] | joy_2[6];
+wire m_start2  = joy_1[7] | joy_2[7];
+
+wire m_up1     = joy_1[3] | (bCabinet ? 1'b0 : m_up2);
+wire m_down1   = joy_1[2] | (bCabinet ? 1'b0 : m_down2);
+wire m_left1   = joy_1[1] | (bCabinet ? 1'b0 : m_left2);
+wire m_right1  = joy_1[0] | (bCabinet ? 1'b0 : m_right2);
+wire m_trig11  = joy_1[4] | (bCabinet ? 1'b0 : m_trig21);
+wire m_trig12  = joy_1[5] | (bCabinet ? 1'b0 : m_trig22);
+
+wire m_coin1   = joy_1[8];
+wire m_coin2   = joy_2[8];
 wire m_coin    = m_coin1|m_coin2;
 
-wire m_pause   = joystk1[9] | joystk2[9];
+wire m_pause   = joy_1[9] | joy_2[9];
 
 // PAUSE SYSTEM
 wire				pause_cpu;
