@@ -177,11 +177,11 @@ assign VGA_SCALER= 0;
 assign LED_USER  = ioctl_download;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
-//assign BUTTONS   = 0;
-//assign BUTTONS   = 0;
+
 //LLAPI
 assign BUTTONS   = llapi_osd;
 //END
+
 assign AUDIO_MIX = 0;
 assign HDMI_FREEZE = 0;
 
@@ -198,19 +198,22 @@ assign VIDEO_ARY =  (!ar) ? ( 13'd939) : 12'd0;
 // 0         1         2         3          4         5         6   
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-//    XXXX            XX    XXX   
+//    XXXX            X     XXX   
 localparam CONF_STR = {
 	"A.NinjaKun;;",
+	//LLAPI: OSD menu item
+	//LLAPI Always ON
+	"-,<< LLAPI enabled >>;",
+	"-,<< Use USER I/O port >>;",
+	"-;",
+	//END LLAPI	
+	
 	"H0OJK,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O35,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"-;",
 	"O6,Service Mode,Off,On;",
 	"-;",
 	"DIP;",
-	"-;",
-	//LLAPI
-	"OM,Serial Mode,Off,LLAPI;",
-	//END
 	"-;",
 	"H1OR,Autosave Hiscores,Off,On;",
 	"P1,Pause options;",
@@ -305,7 +308,7 @@ wire [71:0] llapi_analog, llapi_analog2;
 wire [7:0]  llapi_type, llapi_type2;
 wire llapi_en, llapi_en2;
 
-wire llapi_select = status[22];
+wire llapi_select = 1'b1;
 
 wire llapi_latch_o, llapi_latch_o2, llapi_data_o, llapi_data_o2;
 
