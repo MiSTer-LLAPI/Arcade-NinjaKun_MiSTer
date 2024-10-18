@@ -15,7 +15,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [45:0] HPS_BUS,
+	inout  [48:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -38,6 +38,7 @@ module emu
 	output        VGA_F1,
 	output [1:0]  VGA_SL,
 	output        VGA_SCALER, // Force VGA scaler
+	output 		  VGA_DISABLE,
 
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
@@ -168,9 +169,11 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign VGA_F1    = 0;
 assign VGA_SCALER= 0;
+
 //LLAPI
 //assign USER_OUT  = '1;
 //END
+
 assign LED_USER  = ioctl_download;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
@@ -184,8 +187,8 @@ assign HDMI_FREEZE = 0;
 
 wire [1:0] ar = status[20:19];
 
-assign VIDEO_ARX =  (!ar) ? ( 8'd4) : (ar - 1'd1);
-assign VIDEO_ARY =  (!ar) ? ( 8'd3) : 12'd0;
+assign VIDEO_ARX =  (!ar) ? ( 13'd1285) : (ar - 1'd1);
+assign VIDEO_ARY =  (!ar) ? ( 13'd939) : 12'd0;
 
 `include "build_id.v" 
 `include "rtl/defs.v"
@@ -484,8 +487,8 @@ assign AUDIO_S = 1'b0; // unsigned
 
 
 ///////////////////////////////////////////////////
-wire  [7:0] iDSW1 =  m_dip[0]; //status[39:32];
-wire  [7:0] iDSW2 =  m_dip[1]; //status[14:7];
+wire  [7:0] iDSW1 =  m_dip[0]; 
+wire  [7:0] iDSW2 =  m_dip[1]; 
 
 wire [7:0]  iCTR1,iCTR2,iCTR3;
 
@@ -515,6 +518,16 @@ wire			iRST  = RESET | status[0] | buttons[1] | rom_download;
 wire  [7:0] oPIX;
 assign		POUT = {{oPIX[7:6],oPIX[1:0]},{oPIX[5:4],oPIX[1:0]},{oPIX[3:2],oPIX[1:0]}};
 
+reg [4:0] PALADR;
+reg PALWR;
+reg [24:0] PALDAT;
+always @(posedge clk_sys) begin
+	if (ioctl_wr) begin
+		PALWR <= ioctl_addr[23:5] == {16'h0180, 3'b000};
+	end
+	PALDAT <= ioctl_dout;
+	PALADR <= ioctl_addr[4:0];
+end
 
 FPGA_NINJAKUN GameCore
 (
@@ -536,11 +549,16 @@ FPGA_NINJAKUN GameCore
 
 	.pause(pause_cpu),
 
+	.PALADR(PALADR),
+	.PALWR(PALWR),
+	.PALDAT(PALDAT),
+
 	.hs_address(hs_address),
 	.hs_data_out(hs_data_out),
 	.hs_data_in(hs_data_in),
 	.hs_write(hs_write_enable),
 	.hs_access(hs_access_read|hs_access_write)
+
 );
 
 // HISCORE SYSTEM
