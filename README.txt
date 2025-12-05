@@ -1,3 +1,8 @@
+LLAPI Note : 
+
+1. Place the rbf core file in a folder named _LLAPI/cores/
+2. Place the MRAs files in _LLAPI/_Arcade/
+3. Play !
 ---------------------------------------------------------------------------------
 -- 
 -- Arcade: Ninja-Kun  port to MiSTer by MiSTer-X
