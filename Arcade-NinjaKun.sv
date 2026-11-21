@@ -203,8 +203,11 @@ localparam CONF_STR = {
 	"A.NinjaKun;;",
 	//LLAPI: OSD menu item
 	//LLAPI Always ON
-	"-,<< LLAPI enabled >>;",
-	"-,<< Use USER I/O port >>;",
+	"P2,Controller Guide;",
+	"P2-,LLAPI 2P (USER I/O);",
+	"P2-,LLAPI Driver: 0.5.0;",
+	"P2-,Immediate Repoll: On;",
+	"-,Enhanced Core: 1.0;",
 	"-;",
 	//END LLAPI	
 	
@@ -352,8 +355,15 @@ always_comb begin
 	end
 end
 
-LLAPI llapi
+LLAPI_Enhanced #(.IMMEDIATE_REPOLL(1'b1)) llapi
 (
+	.CMD_VALID(1'b0),
+	.CMD_OPCODE(8'd0),
+	.CMD_PAYLOAD(16'd0),
+	.CMD_RAW(1'b0),
+	.CMD_TX_LENGTH(5'd0),
+	.CMD_RX_LENGTH(4'd0),
+	.CMD_TX_DATA(192'd0),
 	.CLK_50M(CLK_50M),
 	.LLAPI_SYNC(vblank),
 	.IO_LATCH_IN(USER_IN[0]),
@@ -367,8 +377,15 @@ LLAPI llapi
 	.LLAPI_EN(llapi_en)
 );
 
-LLAPI llapi2
+LLAPI_Enhanced #(.IMMEDIATE_REPOLL(1'b1)) llapi2
 (
+	.CMD_VALID(1'b0),
+	.CMD_OPCODE(8'd0),
+	.CMD_PAYLOAD(16'd0),
+	.CMD_RAW(1'b0),
+	.CMD_TX_LENGTH(5'd0),
+	.CMD_RX_LENGTH(4'd0),
+	.CMD_TX_DATA(192'd0),
 	.CLK_50M(CLK_50M),
 	.LLAPI_SYNC(vblank),
 	.IO_LATCH_IN(USER_IN[4]),
